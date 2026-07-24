@@ -177,6 +177,8 @@ main{padding:18px 16px 8px}
 .led .t{font-size:13.5px;font-weight:560;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .led .m{font-size:11px;color:var(--muted)}
 .led .amt{font-size:13.5px;font-weight:640}
+.led .edit{color:var(--faint);padding:9px 5px;font-size:14px;border-radius:8px;transition:all .12s}
+.led .edit:active{color:var(--gold);background:var(--elev);transform:scale(.88)}
 .led .del{color:var(--faint);padding:9px 8px;margin-right:-8px;font-size:15px;border-radius:8px;transition:all .12s}
 .led .del:active{color:var(--coral);background:var(--elev);transform:scale(.88)}
 .empty{text-align:center;color:var(--faint);font-size:13px;padding:30px 10px}
@@ -492,8 +494,17 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:30;background:rgba(20,28,23,.
         <div class="field"><label>Blocked account · €/mo</label><input class="inp num" id="in-blocked" type="number" inputmode="decimal"></div>
         <div class="field"><label>Salary · €/mo</label><input class="inp num" id="in-salary" type="number" inputmode="decimal"></div>
       </div>
-      <div class="field"><label>Cycle starts on day</label><input class="inp num" id="in-cycle" type="number" inputmode="numeric" min="1" max="28"></div>
+      <div class="field"><label>Cycle starts on day · default</label><input class="inp num" id="in-cycle" type="number" inputmode="numeric" min="1" max="28"></div>
       <div class="hint">Your month runs from this day to the day before next month. Set to 25 to match your income dates.</div>
+      <div class="divider"></div>
+      <div class="field"><label>Start day for <b class="num" id="ov-period">—</b> <span style="color:var(--faint);font-weight:400">· use ‹ › in the header to pick a month</span></label>
+        <div class="two">
+          <input class="inp num" id="in-cycle-ov" type="number" inputmode="numeric" min="1" max="28" placeholder="default">
+          <button class="btn ghost" id="ov-reset" style="margin:0">Use default</button>
+        </div>
+      </div>
+      <div class="hint">Override the start day for individual months (e.g. 24, 25, 26). Leave blank to fall back to the default above.</div>
+      <div id="ov-list" style="margin-top:10px"></div>
     </div>
 
     <div class="card">
@@ -617,6 +628,7 @@ function defaults(){
   return {
     income:{blocked:0,salary:0},
     cycleDay:25,
+    cycleDays:{},
     startSavings:0,
     goal:{start:shiftP(periodOf(todayISO()),1),months:4},
     cats:[
@@ -670,7 +682,7 @@ function defaults(){
 
 /* ── State ────────────────────────────────────────────────── */
 var S, curP, pinKey=null;
-var sheetCat=null, lastLogged=null, pendingConfirm=null;
+var sheetCat=null, lastLogged=null, pendingConfirm=null, editingId=null;
 
 /* ── Lock / encryption (PIN-gated, RC4 stream + salt) ─────── */
 var LOCKKEY='asca_budget_lock';
@@ -699,11 +711,18 @@ function save(){var json=JSON.stringify(S);localStorage.setItem(KEY,pinKey?enc(j
 
 function initApp(){
   S=load();
-  curP=(function(){var t=periodOf(todayISO());return (S.goal&&S.goal.start&&S.goal.start>t)?S.goal.start:t;})();
+  if(!S.cycleDays)S.cycleDays={};
+  curP=periodOf(todayISO()); // always open on the cycle that contains today
   if(!localStorage.getItem(KEY))save(); // persist defaults encrypted on first unlock
   renderAll();
 }
 function cycleDay(){return Math.min(28,Math.max(1,(typeof S!=='undefined'&&S&&+S.cycleDay)||25));}
+// per-month start day: an override in S.cycleDays[key] wins over the global default
+function cycleDayFor(key){
+  var ov=(typeof S!=='undefined'&&S&&S.cycleDays)?S.cycleDays[key]:null;
+  var v=(ov!=null&&ov!=='')?+ov:cycleDay();
+  return Math.min(28,Math.max(1,v||25));
+}
 
 /* ── Date / period helpers (cycle = cycleDay → day-before) ─── */
 function pad(n){return String(n).padStart(2,'0');}
@@ -713,15 +732,18 @@ function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2
 function parseISO(iso){var p=iso.split('-');return new Date(+p[0],+p[1]-1,+p[2]);}
 function addDaysISO(iso,n){var d=parseISO(iso);d.setDate(d.getDate()+n);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
 function addMonthsISO(iso,n){var d=parseISO(iso);d.setMonth(d.getMonth()+n);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+function isoOf(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+// default date for a new entry: today if the current cycle is on screen, else that cycle's start
+function logDateFor(){return isCur()?todayISO():isoOf(pStart(curP));}
 
 // period key = YYYY-MM of the cycle START
 function periodOf(iso){
   var y=+iso.slice(0,4),m=+iso.slice(5,7),d=+iso.slice(8,10);
-  if(d>=cycleDay())return y+'-'+pad(m);
+  if(d>=cycleDayFor(y+'-'+pad(m)))return y+'-'+pad(m);
   var pm=m-1,py=y;if(pm<1){pm=12;py--;}return py+'-'+pad(pm);
 }
-function pStart(key){var p=key.split('-');return new Date(+p[0],+p[1]-1,cycleDay());}
-function pEnd(key){var p=key.split('-');return new Date(+p[0],+p[1],cycleDay()-1);}
+function pStart(key){var p=key.split('-');return new Date(+p[0],+p[1]-1,cycleDayFor(key));}
+function pEnd(key){var nk=shiftP(key,1),p=nk.split('-');return new Date(+p[0],+p[1]-1,cycleDayFor(nk)-1);}
 function daysInP(key){return Math.round((pEnd(key)-pStart(key))/864e5)+1;}
 function numWeeks(key){return Math.ceil(daysInP(key)/7);}
 function dayIndexIn(iso,key){return Math.floor((parseISO(iso)-pStart(key))/864e5);}
@@ -847,6 +869,7 @@ function renderHome(){
       '<div class="body"><div class="t">'+esc(e.name||c.name)+'</div>'+
       '<div class="m num">'+qtxt+esc(c.name)+' · '+fmtDate(e.date)+((+e.covers>1)?' · '+e.covers+'-cyc':'')+'</div></div>'+
       '<span class="amt num">'+eur2(e.amt)+amtxt+'</span>'+
+      '<button class="edit" data-edit="'+e.id+'" aria-label="Edit entry">✎</button>'+
       '<button class="del" data-del="'+e.id+'">✕</button></div>';
   }).join('');}
 }
@@ -1012,6 +1035,7 @@ function renderSetup(){
   $('#in-blocked').value=S.income.blocked;
   $('#in-salary').value=S.income.salary;
   $('#in-cycle').value=cycleDay();
+  renderCycleOverrides();
   $('#in-start').value=S.goal.start;
   $('#in-months').value=S.goal.months;
   $('#in-saved0').value=+S.startSavings||0;
@@ -1042,6 +1066,17 @@ function renderSetup(){
 
   var opts=S.cats.map(function(c){return '<option value="'+c.id+'">'+esc(c.name)+'</option>';}).join('');
   $('#ni-cat').innerHTML=opts;$('#nr-cat').innerHTML=opts;
+}
+function periodTitle(key){var p=key.split('-');return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+p[1]-1]+' '+p[0];}
+function renderCycleOverrides(){
+  var ov=S.cycleDays||{};
+  $('#ov-period').textContent=periodTitle(curP);
+  $('#in-cycle-ov').value=(ov[curP]!=null&&ov[curP]!=='')?ov[curP]:'';
+  var keys=Object.keys(ov).filter(function(k){return ov[k]!=null&&ov[k]!=='';}).sort();
+  $('#ov-list').innerHTML=keys.length?keys.map(function(k){
+    return '<div class="setrow"><span class="sn">'+periodTitle(k)+'<small>starts on the '+cycleDayFor(k)+'</small></span>'+
+      '<button class="rm" data-ovrm="'+k+'">✕</button></div>';
+  }).join(''):'<div class="hint">No per-month overrides yet — every cycle uses the default.</div>';
 }
 
 /* ── Render orchestration ─────────────────────────────────── */
@@ -1075,7 +1110,7 @@ function tryAdd(o,onDone){
   var e=commit(o);if(onDone)onDone(e);
 }
 function logItem(it){
-  tryAdd({cat:it.cat,item:it.id,name:it.name,qty:1,amt:it.price,date:todayISO()},function(e){
+  tryAdd({cat:it.cat,item:it.id,name:it.name,qty:1,amt:it.price,date:logDateFor()},function(e){
     lastLogged=e;showToast('Logged <b>'+esc(it.name.split(' ')[0])+'</b> '+eur2(it.price),true);
   });
 }
@@ -1098,6 +1133,7 @@ function showToast(html,undo){
 
 /* ── Sheet ────────────────────────────────────────────────── */
 function openSheet(prefill){
+  editingId=prefill&&prefill.editId?prefill.editId:null;
   sheetCat=prefill&&prefill.cat?prefill.cat:S.cats[0].id;
   $('#sheet-cats').innerHTML=S.cats.map(function(c){
     return '<button class="cp2'+(c.id===sheetCat?' sel':'')+'" data-scat="'+c.id+'"><span class="sw" style="background:'+c.color+'"></span>'+esc(c.name)+'</button>';
@@ -1106,8 +1142,14 @@ function openSheet(prefill){
   $('#sh-qty').value=prefill&&prefill.qty?prefill.qty:1;
   $('#sh-amt').value=prefill&&prefill.amt!=null?prefill.amt:'';
   $('#sh-amt').style.borderColor='';
-  $('#sh-date').value=todayISO();
+  $('#sh-date').value=prefill&&prefill.date?prefill.date:logDateFor();
+  $('#sheet-title').textContent=editingId?'Edit entry':'Add expense';
+  $('#sh-save').textContent=editingId?'Save changes':'Log it';
   $('#scrim').classList.add('open');$('#sheet').classList.add('open');
+}
+function editExpense(id){
+  var e=S.exp.filter(function(x){return x.id===id;})[0];if(!e)return;
+  openSheet({cat:e.cat,name:e.name,qty:e.qty,amt:e.amt,date:e.date,editId:e.id});
 }
 function closeSheet(){$('#scrim').classList.remove('open');$('#sheet').classList.remove('open');}
 
@@ -1134,9 +1176,10 @@ $('#mprev').onclick=function(){curP=shiftP(curP,-1);renderAll();};
 $('#mnext').onclick=function(){curP=shiftP(curP,1);renderAll();};
 
 $('#v-home').addEventListener('click',function(e){
-  var t=e.target.closest('[data-item],[data-del],[data-pay],[data-open-sheet],[data-logrec]');if(!t)return;
+  var t=e.target.closest('[data-item],[data-del],[data-edit],[data-pay],[data-open-sheet],[data-logrec]');if(!t)return;
   if(t.dataset.item){var it=S.items.filter(function(x){return x.id===t.dataset.item;})[0];if(it)logItem(it);}
   else if(t.dataset.del)delExpense(t.dataset.del);
+  else if(t.dataset.edit)editExpense(t.dataset.edit);
   else if(t.dataset.pay)payFixed(t.dataset.pay);
   else if(t.dataset.logrec)logRecurring(t.dataset.logrec);
   else if(t.dataset.openSheet)openSheet(null);
@@ -1145,7 +1188,7 @@ function payFixed(cid){
   var c=catOf(cid);if(!c)return;
   var already=spentByCat(curP)[cid]||0,due=(+c.budget||0)-already;
   if(due<=0.01){showToast(esc(c.name)+' already covered');return;}
-  tryAdd({cat:cid,name:c.name+' (bill)',qty:1,amt:due,date:isCur()?todayISO():pStart(curP).getFullYear()+'-'+pad(pStart(curP).getMonth()+1)+'-'+pad(cycleDay())},function(e){
+  tryAdd({cat:cid,name:c.name+' (bill)',qty:1,amt:due,date:logDateFor()},function(e){
     lastLogged=e;showToast('<b>'+esc(c.name)+'</b> marked paid '+eur(due),true);
   });
 }
@@ -1159,8 +1202,14 @@ $('#q-plus').onclick=function(){var q=$('#sh-qty');q.value=(+q.value||0)+1;};
 $('#sh-save').onclick=function(){
   var amt=parseFloat($('#sh-amt').value);
   if(!amt||amt<=0){$('#sh-amt').focus();$('#sh-amt').style.borderColor='var(--coral)';return;}
-  var o={cat:sheetCat,name:$('#sh-name').value.trim(),qty:parseFloat($('#sh-qty').value)||1,amt:amt,date:$('#sh-date').value||todayISO()};
+  var o={cat:sheetCat,name:$('#sh-name').value.trim(),qty:parseFloat($('#sh-qty').value)||1,amt:amt,date:$('#sh-date').value||logDateFor()};
+  var eid=editingId;editingId=null;
   closeSheet();
+  if(eid){
+    var e=S.exp.filter(function(x){return x.id===eid;})[0];
+    if(e){e.cat=o.cat;e.name=o.name;e.qty=o.qty;e.amt=o.amt;e.date=o.date;save();renderAll();showToast('Entry updated');}
+    return;
+  }
   tryAdd(o,function(){showToast('Logged '+eur2(amt));});
 };
 
@@ -1180,15 +1229,24 @@ $('#v-setup').addEventListener('input',function(e){setupField(e,true);});
 function rec(id){return (S.recurring||[]).filter(function(x){return x.id===id;})[0];}
 function itm(id){return S.items.filter(function(x){return x.id===id;})[0];}
 $('#v-setup').addEventListener('click',function(e){
-  var t=e.target.closest('[data-crm],[data-irm],[data-rrm],[data-hard]');if(!t)return;
+  var t=e.target.closest('[data-crm],[data-irm],[data-rrm],[data-hard],[data-ovrm]');if(!t)return;
   if(t.dataset.hard){var c=catOf(t.dataset.hard);if(c){c.hard=!c.hard;save();renderSetup();renderHome();}}
   else if(t.dataset.crm){S.cats=S.cats.filter(function(c){return c.id!==t.dataset.crm;});save();renderSetup();renderHome();}
   else if(t.dataset.irm){S.items=S.items.filter(function(i){return i.id!==t.dataset.irm;});save();renderSetup();renderHome();}
   else if(t.dataset.rrm){S.recurring=S.recurring.filter(function(r){return r.id!==t.dataset.rrm;});save();renderSetup();renderHome();}
+  else if(t.dataset.ovrm){if(S.cycleDays)delete S.cycleDays[t.dataset.ovrm];save();renderAll();}
 });
 $('#in-blocked').onchange=function(){S.income.blocked=parseFloat(this.value)||0;save();renderHome();};
 $('#in-salary').onchange=function(){S.income.salary=parseFloat(this.value)||0;save();renderHome();};
 $('#in-cycle').onchange=function(){S.cycleDay=Math.min(28,Math.max(1,parseInt(this.value)||25));curP=periodOf(todayISO());save();renderAll();};
+$('#in-cycle-ov').onchange=function(){
+  if(!S.cycleDays)S.cycleDays={};
+  var v=parseInt(this.value);
+  if(this.value===''||isNaN(v))delete S.cycleDays[curP];
+  else S.cycleDays[curP]=Math.min(28,Math.max(1,v));
+  save();renderAll();
+};
+$('#ov-reset').onclick=function(){if(S.cycleDays)delete S.cycleDays[curP];save();renderAll();};
 $('#in-start').onchange=function(){if(this.value){S.goal.start=this.value;save();renderHome();}};
 $('#in-months').onchange=function(){S.goal.months=parseInt(this.value)||4;save();renderHome();};
 $('#in-saved0').onchange=function(){S.startSavings=parseFloat(this.value)||0;save();renderHome();};
