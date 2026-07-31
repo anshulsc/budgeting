@@ -191,6 +191,34 @@ main{padding:18px 16px 8px}
 .empty{text-align:center;color:var(--faint);font-size:13px;padding:30px 10px}
 .empty b{display:block;color:var(--muted);font-size:14px;margin-bottom:4px}
 
+/* ── Loans (lent & borrowed) ──────────────────────────────── */
+.loan-sum{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--line);border-radius:14px;overflow:hidden;margin-bottom:6px}
+.loan-sum div{background:var(--surface);padding:10px 12px}
+.loan-sum .k{font-size:10px;color:var(--faint);text-transform:uppercase;letter-spacing:.06em}
+.loan-sum .v{font-size:15px;font-weight:640;margin-top:3px}
+.loan{display:flex;align-items:center;gap:11px;padding:12px 0;border-bottom:1px solid var(--line)}
+.loan:last-child{border-bottom:none}
+.loan .li{flex:1;min-width:0}
+.loan .ln{font-size:13.5px;font-weight:560;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.loan .lm{font-size:11px;color:var(--muted);margin-top:2px}
+.loan .lm .ldue{color:var(--amber)}
+.loan .lm .lover{color:var(--coral);font-weight:600}
+.loan .la{font-size:13.5px;font-weight:640;flex:none}
+.loan.lent .la{color:var(--gold)}
+.loan.borrowed .la{color:var(--coral)}
+.loan.done{opacity:.55}
+.loan.done .la{color:var(--faint)}
+.loan .settle{font-size:11px;font-weight:600;color:var(--mint);background:var(--mint-dim);padding:5px 11px;border-radius:9px;border:1px solid rgba(99,214,154,.10);flex:none;transition:transform .1s}
+.loan .settle:active{transform:scale(.92)}
+.loan .edit,.loan .del{color:var(--faint);padding:9px 5px;font-size:14px;border-radius:8px;transition:all .12s;flex:none}
+.loan .del{padding:9px 8px;margin-right:-8px;font-size:15px}
+.loan .edit:active{color:var(--gold);background:var(--elev)}
+.loan .del:active{color:var(--coral);background:var(--elev)}
+.seg{display:flex;background:var(--elev);border:1px solid var(--line);border-radius:12px;padding:4px;gap:4px;margin-bottom:16px}
+.seg button{flex:1;padding:10px;border-radius:9px;font-size:13px;font-weight:600;color:var(--muted);transition:all .15s}
+.seg button.sel{background:var(--gold-dim);color:var(--gold);box-shadow:0 0 8px var(--gold-glow)}
+.seg button.sel.neg{background:var(--coral-dim);color:var(--coral);box-shadow:none}
+
 /* ── Stats ────────────────────────────────────────────────── */
 .stat-row{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--line);transition:background .12s}
 .stat-row:last-child{border-bottom:none}
@@ -471,6 +499,13 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:30;background:rgba(20,28,23,.
       <div id="envelopes"></div>
     </div>
 
+    <div class="card" id="loan-card">
+      <div class="card-h"><h3>Lent &amp; borrowed</h3><button class="sub" id="loan-sub">—</button></div>
+      <div class="loan-sum" id="loan-sum"></div>
+      <div id="loans"></div>
+      <button class="btn ghost" id="add-loan" style="margin-top:12px">+ Lend / borrow money</button>
+    </div>
+
     <div class="card">
       <div class="card-h"><h3>This cycle's log</h3><span class="sub" id="log-count">—</span></div>
       <div id="ledger"></div>
@@ -532,6 +567,8 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:30;background:rgba(20,28,23,.
       <div class="stat-row"><span class="lab">Budgeted (envelopes)</span><span class="val num" id="s-budget">€0</span></div>
       <div class="stat-row"><span class="lab">Spent (bills amortized)</span><span class="val num" id="s-spent">€0</span></div>
       <div class="stat-row"><span class="lab">Saved so far</span><span class="val num" id="s-saved" style="color:var(--gold)">€0</span></div>
+      <div class="stat-row" id="sr-lent" style="display:none"><span class="lab">Lent out · still yours</span><span class="val num" id="s-lent" style="color:var(--gold)">€0</span></div>
+      <div class="stat-row" id="sr-owe" style="display:none"><span class="lab">Borrowed · you owe</span><span class="val num" id="s-owe" style="color:var(--coral)">€0</span></div>
       <div class="stat-row"><span class="lab">Savings rate (projected)</span><span class="val num" id="s-rate" style="color:var(--gold)">—</span></div>
       <div class="stat-row"><span class="lab">Daily burn (avg)</span><span class="val num" id="s-burn">€0</span></div>
     </div>
@@ -666,6 +703,7 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:30;background:rgba(20,28,23,.
     <div class="card">
       <div class="card-h"><h3>Data</h3><span class="sub">backup & export</span></div>
       <button class="btn ghost" id="exp-csv">Export CSV (spreadsheet)</button>
+      <button class="btn ghost" id="exp-ious">Export IOUs (CSV)</button>
       <button class="btn ghost" id="exp-json">Export backup (JSON)</button>
       <button class="btn ghost" id="imp-json">Import backup</button>
       <input type="file" id="imp-file" accept="application/json" hidden>
@@ -704,6 +742,44 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:30;background:rgba(20,28,23,.
   </div>
   <div class="field"><label>Date</label><input class="inp num" id="sh-date" type="date"></div>
   <button class="btn primary" id="sh-save">Log it</button>
+</div>
+
+<!-- Lend / borrow sheet -->
+<div class="sheet" id="lsheet">
+  <div class="grab"></div>
+  <h3 id="lsheet-title">Lend / borrow</h3>
+  <div class="seg" id="l-dir">
+    <button data-dir="lent" class="sel">I lent money</button>
+    <button data-dir="borrowed">I borrowed</button>
+  </div>
+  <div class="field"><label>Who</label><input class="inp" id="l-person" list="l-people" placeholder="e.g. Rohit" enterkeyhint="next"><datalist id="l-people"></datalist></div>
+  <div class="two">
+    <div class="field"><label>Amount €</label><input class="inp num" id="l-amt" type="number" inputmode="decimal" placeholder="0.00"></div>
+    <div class="field"><label>Date</label><input class="inp num" id="l-date" type="date"></div>
+  </div>
+  <div class="two">
+    <div class="field"><label>Due back (optional)</label><input class="inp num" id="l-due" type="date"></div>
+    <div class="field"><label>Note (optional)</label><input class="inp" id="l-note" placeholder="e.g. dinner split"></div>
+  </div>
+  <button class="btn primary" id="l-save">Save</button>
+  <div class="hint">IOUs live outside your budget — they never count as spending, income or savings. Money you lend stays counted as yours until it comes back.</div>
+</div>
+
+<!-- Repayment sheet -->
+<div class="sheet" id="psheet">
+  <div class="grab"></div>
+  <h3 id="psheet-title">Log repayment</h3>
+  <div class="chips" style="margin-bottom:16px">
+    <button class="chip" id="p-half">Half</button>
+    <button class="chip" id="p-all">All of it</button>
+  </div>
+  <div class="two">
+    <div class="field"><label>Amount €</label><input class="inp num" id="p-amt" type="number" inputmode="decimal"></div>
+    <div class="field"><label>Date</label><input class="inp num" id="p-date" type="date"></div>
+  </div>
+  <div id="p-hist"></div>
+  <button class="btn primary" id="p-save">Settle in full</button>
+  <div class="hint" id="p-hint"></div>
 </div>
 
 <!-- Hard-limit confirm -->
@@ -776,6 +852,7 @@ function defaults(){
       {id:'r_gym',name:'Gym (3-month pass)',cat:'gym',amount:78,covers:3,unit:'months',n:3,next:'2026-08-13'},
       {id:'r_hair',name:'Haircut',cat:'grooming',amount:28,covers:1,unit:'days',n:20,next:'2026-08-05'}
     ],
+    loans:[],
     exp:[]
   };
 }
@@ -812,6 +889,7 @@ function save(){var json=JSON.stringify(S);localStorage.setItem(KEY,pinKey?enc(j
 function initApp(){
   S=load();
   if(!S.cycleDays)S.cycleDays={};
+  if(!S.loans)S.loans=[];
   curP=periodOf(todayISO()); // always open on the cycle that contains today
   if(!localStorage.getItem(KEY))save(); // persist defaults encrypted on first unlock
   renderAll();
@@ -960,6 +1038,8 @@ function renderHome(){
       '<div class="env-foot"><span class="env-left'+(over?' over':'')+'">'+(over?eur(sp-bd)+' over':eur(bd-sp)+' left')+'</span>'+btn+'</div></div>';
   }).join('');
 
+  renderLoans();
+
   var fc=envFilter?catOf(envFilter):null;
   var list=ledgerFor(curP).filter(function(e){return !fc||e.cat===envFilter;})
     .sort(function(a,b){return a.date<b.date?1:a.date>b.date?-1:(a.id<b.id?1:-1);});
@@ -1004,6 +1084,52 @@ function renderProjection(){
     : 'Starting from €0 today, at your plan of '+eur(rate)+'/mo. Every euro you don’t spend lands here.';
 }
 
+/* ── Loans: lent & borrowed — kept outside all budget math ── */
+var showSettledLoans=false;
+function loanOf(id){return (S.loans||[]).filter(function(l){return l.id===id;})[0];}
+function paidOf(l){return (l.pays||[]).reduce(function(a,p){return a+(+p.amt||0);},0);}
+function remainOf(l){return Math.max((+l.amt||0)-paidOf(l),0);}
+function renderLoans(){
+  var loans=S.loans||[];
+  var open=loans.filter(function(l){return !l.settled;}),done=loans.filter(function(l){return l.settled;});
+  var lent=0,bor=0;
+  open.forEach(function(l){if(l.dir==='borrowed')bor+=remainOf(l);else lent+=remainOf(l);});
+  var sub=$('#loan-sub');
+  sub.textContent=done.length?(showSettledLoans?'hide settled':done.length+' settled · show'):(open.length?open.length+' open':'outside the budget');
+  sub.style.textDecoration=done.length?'underline':'';
+  var net=lent-bor,sumEl=$('#loan-sum');
+  if(open.length){sumEl.style.display='';
+    sumEl.innerHTML='<div><div class="k">Out with friends</div><div class="v num" style="color:var(--gold)">'+eur(lent)+'</div></div>'+
+      '<div><div class="k">You owe</div><div class="v num" style="color:'+(bor>0?'var(--coral)':'var(--ink)')+'">'+eur(bor)+'</div></div>'+
+      '<div><div class="k">Net</div><div class="v num">'+(net>=0?'+':'')+eur(net)+'</div></div>';
+  }else sumEl.style.display='none';
+  var byDate=function(a,b){return a.date<b.date?1:-1;};
+  var list=open.slice().sort(byDate).concat(showSettledLoans?done.slice().sort(byDate):[]);
+  if(!list.length){
+    $('#loans').innerHTML=loans.length
+      ? '<div class="empty" style="padding:14px 10px"><b>All settled ✓</b>Everything you lent came back.</div>'
+      : '<div class="empty" style="padding:14px 10px"><b>No IOUs yet</b>Money you lend stays counted as yours — it never touches your spending or savings.</div>';
+    return;
+  }
+  $('#loans').innerHTML=list.map(function(l){
+    var isLent=l.dir!=='borrowed',rem=remainOf(l),paid=paidOf(l);
+    var meta=(isLent?'lent':'borrowed')+' · '+fmtDate(l.date);
+    if(paid>0&&!l.settled)meta+=' · '+eur(paid)+' of '+eur(+l.amt||0)+(isLent?' back':' paid');
+    if(l.note)meta+=' · '+esc(l.note);
+    if(l.due&&!l.settled){
+      var dd=Math.round((parseISO(l.due)-parseISO(todayISO()))/864e5);
+      meta+=' · <span class="'+(dd<0?'lover':dd<=3?'ldue':'')+'">'+(dd<0?Math.abs(dd)+'d overdue':dd===0?'due today':'due in '+dd+'d')+'</span>';
+    }
+    if(l.settled)meta+=' · settled '+fmtDate(l.settled);
+    return '<div class="loan '+(isLent?'lent':'borrowed')+(l.settled?' done':'')+'">'+
+      '<div class="li"><div class="ln">'+esc(l.person||'Someone')+'</div><div class="lm num">'+meta+'</div></div>'+
+      '<span class="la num">'+(isLent?'':'−')+eur2(l.settled?(+l.amt||0):rem)+'</span>'+
+      (l.settled?'':'<button class="settle" data-lpay="'+l.id+'">'+(isLent?'Got back':'Pay back')+'</button>')+
+      '<button class="edit" data-ledit="'+l.id+'" aria-label="Edit IOU">✎</button>'+
+      '<button class="del" data-ldel="'+l.id+'" aria-label="Delete IOU">✕</button></div>';
+  }).join('');
+}
+
 function renderUpcoming(){
   var card=$('#up-card');
   if(!S.recurring||!S.recurring.length){card.style.display='none';return;}
@@ -1035,6 +1161,11 @@ function renderStats(){
   $('#s-rate').textContent=inc>0?Math.round((inc-projectedSpend(curP))/inc*100)+'%':'—';
   var dim=daysInP(curP),dn=dayNowOf(curP);
   $('#s-burn').textContent=dn>0?eur2(spent/dn):'€0';
+
+  var lentO=0,oweO=0;
+  (S.loans||[]).forEach(function(l){if(!l.settled){if(l.dir==='borrowed')oweO+=remainOf(l);else lentO+=remainOf(l);}});
+  $('#sr-lent').style.display=lentO>0?'':'none';$('#s-lent').textContent=eur(lentO);
+  $('#sr-owe').style.display=oweO>0?'':'none';$('#s-owe').textContent=eur(oweO);
 
   renderFlags();
   renderHistory();
@@ -1476,8 +1607,103 @@ function payFixed(cid){
   });
 }
 
+/* ── Loan sheet ───────────────────────────────────────────── */
+var loanDir='lent',loanEditId=null;
+function setLoanDir(d){loanDir=d;
+  $$('#l-dir button').forEach(function(b){var on=b.dataset.dir===d;b.classList.toggle('sel',on);b.classList.toggle('neg',on&&d==='borrowed');});}
+function openLoanSheet(l){
+  loanEditId=l?l.id:null;
+  setLoanDir(l?l.dir:'lent');
+  var seen={},opts='';
+  (S.loans||[]).forEach(function(x){var p=(x.person||'').trim();if(p&&!seen[p.toLowerCase()]){seen[p.toLowerCase()]=1;opts+='<option value="'+esc(p)+'">';}});
+  $('#l-people').innerHTML=opts;
+  $('#l-person').value=l?(l.person||''):'';
+  $('#l-amt').value=l?l.amt:'';
+  $('#l-amt').style.borderColor='';
+  $('#l-date').value=l?l.date:todayISO();
+  $('#l-due').value=(l&&l.due)?l.due:'';
+  $('#l-note').value=(l&&l.note)?l.note:'';
+  $('#lsheet-title').textContent=l?'Edit IOU':'Lend / borrow';
+  $('#scrim').classList.add('open');$('#lsheet').classList.add('open');
+}
+function closeLoanSheet(){loanEditId=null;$('#scrim').classList.remove('open');$('#lsheet').classList.remove('open');}
+$('#add-loan').onclick=function(){openLoanSheet(null);};
+$('#l-dir').addEventListener('click',function(e){var t=e.target.closest('[data-dir]');if(t)setLoanDir(t.dataset.dir);});
+$('#l-save').onclick=function(){
+  var amt=parseFloat($('#l-amt').value);
+  if(!amt||amt<=0){$('#l-amt').focus();$('#l-amt').style.borderColor='var(--coral)';return;}
+  var person=$('#l-person').value.trim()||'Someone';
+  if(!S.loans)S.loans=[];
+  if(loanEditId){
+    var l=loanOf(loanEditId);
+    if(l){l.dir=loanDir;l.person=person;l.amt=amt;l.date=$('#l-date').value||todayISO();l.due=$('#l-due').value||null;l.note=$('#l-note').value.trim();}
+    closeLoanSheet();save();renderLoans();showToast('IOU updated');return;
+  }
+  S.loans.push({id:uid(),dir:loanDir,person:person,amt:amt,date:$('#l-date').value||todayISO(),due:$('#l-due').value||null,note:$('#l-note').value.trim(),pays:[],settled:null});
+  closeLoanSheet();save();renderLoans();
+  showToast(loanDir==='borrowed'
+    ? 'Borrowed <b>'+eur2(amt)+'</b> from '+esc(person)+' — not counted as income'
+    : 'Lent <b>'+eur2(amt)+'</b> to '+esc(person)+' — still yours');
+};
+/* repayment sheet: partial or full */
+var payLoanId=null;
+function openPaySheet(l){
+  payLoanId=l.id;
+  var rem=remainOf(l),isLent=l.dir!=='borrowed';
+  $('#psheet-title').textContent=isLent?'Money back from '+(l.person||'someone'):'Pay back '+(l.person||'someone');
+  $('#p-amt').value=Math.round(rem*100)/100;
+  $('#p-amt').style.borderColor='';
+  $('#p-date').value=todayISO();
+  $('#p-hist').innerHTML=(l.pays||[]).map(function(p){
+    return '<div class="stat-row" style="padding:8px 0"><span class="lab">'+(isLent?'Got back':'Paid back')+' · '+fmtDate(p.date)+'</span><span class="val num">'+eur2(p.amt)+'</span></div>';
+  }).join('');
+  $('#p-hint').textContent=eur2(rem)+' outstanding of '+eur2(+l.amt||0)+(isLent
+    ? ' — repayments come back into your money, never counted as income.'
+    : ' — paying back never counts as spending.');
+  updatePayBtn();
+  $('#scrim').classList.add('open');$('#psheet').classList.add('open');
+}
+function closePaySheet(){payLoanId=null;$('#scrim').classList.remove('open');$('#psheet').classList.remove('open');}
+function updatePayBtn(){
+  var l=loanOf(payLoanId);if(!l)return;
+  var rem=remainOf(l),v=parseFloat($('#p-amt').value)||0,isLent=l.dir!=='borrowed';
+  $('#p-save').textContent=v>=rem-0.005?'Settle in full':'Log '+eur2(v)+(isLent?' back':' paid');
+}
+$('#p-amt').oninput=function(){this.style.borderColor='';updatePayBtn();};
+$('#p-half').onclick=function(){var l=loanOf(payLoanId);if(l){$('#p-amt').value=Math.round(remainOf(l)/2*100)/100;updatePayBtn();}};
+$('#p-all').onclick=function(){var l=loanOf(payLoanId);if(l){$('#p-amt').value=Math.round(remainOf(l)*100)/100;updatePayBtn();}};
+$('#p-save').onclick=function(){
+  var l=loanOf(payLoanId);if(!l)return;
+  var rem=remainOf(l),v=parseFloat($('#p-amt').value);
+  if(!v||v<=0||v>rem+0.005){$('#p-amt').focus();$('#p-amt').style.borderColor='var(--coral)';return;}
+  if(!l.pays)l.pays=[];
+  var pay={amt:Math.min(v,rem),date:$('#p-date').value||todayISO()};
+  l.pays.push(pay);
+  var full=remainOf(l)<=0.005;
+  if(full)l.settled=pay.date;
+  closePaySheet();save();renderAll();
+  var isLent=l.dir!=='borrowed';
+  showToast(full
+    ? 'Settled with <b>'+esc(l.person)+'</b> ✓'
+    : (isLent?'Got <b>':'Paid <b>')+eur2(pay.amt)+'</b>'+(isLent?' back from ':' back to ')+esc(l.person)+' · '+eur2(remainOf(l))+' left',
+    function(){l.pays.pop();l.settled=null;save();renderAll();});
+};
+
+$('#loan-card').addEventListener('click',function(e){
+  if(e.target.id==='loan-sub'){showSettledLoans=!showSettledLoans;renderLoans();return;}
+  var t=e.target.closest('[data-lpay],[data-ledit],[data-ldel]');if(!t)return;
+  if(t.dataset.lpay){var lp=loanOf(t.dataset.lpay);if(lp)openPaySheet(lp);}
+  else if(t.dataset.ledit){var le=loanOf(t.dataset.ledit);if(le)openLoanSheet(le);}
+  else if(t.dataset.ldel){
+    var id=t.dataset.ldel,ld=loanOf(id);
+    S.loans=S.loans.filter(function(x){return x.id!==id;});save();renderAll();
+    if(ld)showToast('Deleted IOU with <b>'+esc(ld.person)+'</b> '+eur2(ld.amt),
+      function(){S.loans.push(ld);save();renderAll();});
+  }
+});
+
 $('#fab').onclick=function(){openSheet(null);};
-$('#scrim').onclick=closeSheet;
+$('#scrim').onclick=function(){closeSheet();closeLoanSheet();closePaySheet();};
 $('#sheet-cats').addEventListener('click',function(e){var t=e.target.closest('[data-scat]');if(!t)return;
   sheetCat=t.dataset.scat;sheetItem=null;sheetUnit=0;
   $$('#sheet-cats .cp2').forEach(function(x){x.classList.toggle('sel',x.dataset.scat===sheetCat);});
@@ -1584,6 +1810,14 @@ $('#exp-csv').onclick=function(){
   var csv=rows.map(function(r){return r.map(function(x){return '"'+String(x).replace(/"/g,'""')+'"';}).join(',');}).join('\n');
   download('vault-expenses.csv','text/csv',csv);
 };
+$('#exp-ious').onclick=function(){
+  var rows=[['date','direction','person','amount_eur','repaid_eur','outstanding_eur','due','settled','note']];
+  (S.loans||[]).slice().sort(function(a,b){return a.date<b.date?-1:1;}).forEach(function(l){
+    rows.push([l.date,l.dir==='borrowed'?'borrowed':'lent',l.person||'',(+l.amt||0).toFixed(2),paidOf(l).toFixed(2),remainOf(l).toFixed(2),l.due||'',l.settled||'',l.note||'']);
+  });
+  var csv=rows.map(function(r){return r.map(function(x){return '"'+String(x).replace(/"/g,'""')+'"';}).join(',');}).join('\n');
+  download('vault-ious.csv','text/csv',csv);
+};
 $('#exp-json').onclick=function(){download('vault-backup.json','application/json',JSON.stringify(S,null,2));};
 $('#imp-json').onclick=function(){$('#imp-file').click();};
 $('#imp-file').onchange=function(e){
@@ -1651,7 +1885,7 @@ document.addEventListener('keydown',function(e){
     else if(e.key==='Backspace')pressKey('del');
     return;
   }
-  if(e.key==='Escape'){closeSheet();closeConfirm();}
+  if(e.key==='Escape'){closeSheet();closeLoanSheet();closePaySheet();closeConfirm();}
 });
 $('#lock-reset').onclick=function(){
   if(confirm('Reset the app? This erases all data on this device and sets a new PIN.')){
