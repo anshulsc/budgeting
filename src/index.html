@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0E1310">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Vault">
+<title>Vault — Budget</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;520;560;600;640;680;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Lock screen -->
+<div class="lock" id="lock">
+  <div class="lock-inner">
+    <div class="lock-mark">V</div>
+    <div class="lock-title">Vault</div>
+    <div class="lock-sub" id="lock-sub">Enter your PIN</div>
+    <div class="dots" id="dots"><span></span><span></span><span></span><span></span></div>
+    <div class="lock-err" id="lock-err"></div>
+    <div class="keypad" id="keypad">
+      <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+      <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+      <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+      <button class="blank"></button><button data-k="0">0</button><button class="fn" data-k="del">⌫</button>
+    </div>
+    <button class="lock-reset" id="lock-reset">Forgot PIN? Reset app</button>
+  </div>
+</div>
+
+<header>
+  <div class="brand"><div class="mark">V</div><div class="btitle"><b>Vault</b><div class="today num" id="today">—</div></div></div>
+  <div class="monthnav">
+    <button id="mprev" aria-label="Previous period">‹</button>
+    <span class="mlabel num" id="mlabel">—</span>
+    <button id="mnext" aria-label="Next period">›</button>
+  </div>
+</header>
+
+<main>
+  <!-- ══ HOME ══ -->
+  <section class="view active" id="v-home">
+    <div class="hero">
+      <div class="eyebrow">Projected savings · this cycle</div>
+      <div class="hero-big num" id="h-save">€0</div>
+      <div class="hero-sub" id="h-sub">—</div>
+      <div id="h-track"></div>
+      <div class="safe" id="h-safe"></div>
+      <div class="hero-grid">
+        <div><div class="k">Income</div><div class="v num" id="h-inc">€0</div></div>
+        <div><div class="k">Spent</div><div class="v num" id="h-spent">€0</div></div>
+        <div><div class="k">Left to spend</div><div class="v num" id="h-left">€0</div></div>
+      </div>
+    </div>
+
+    <div class="card proj-card">
+      <div class="card-h"><h3>If you keep this up</h3><span class="sub" id="proj-rate">—</span></div>
+      <div id="proj-rows"></div>
+      <div class="hint" id="proj-foot">—</div>
+    </div>
+
+    <div class="card" id="up-card">
+      <div class="card-h"><h3>Upcoming</h3><span class="sub">recurring & scheduled</span></div>
+      <div id="upcoming"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h3>By week</h3><span class="sub" id="wk-pace">—</span></div>
+      <div class="weeks" id="weeks"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h3>Quick add</h3><span class="sub">One tap = one unit</span></div>
+      <div class="chips" id="chips"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h3>Envelopes</h3><span class="sub" id="env-sub">—</span></div>
+      <div id="envelopes"></div>
+    </div>
+
+    <div class="card" id="loan-card">
+      <div class="card-h"><h3>Lent &amp; borrowed</h3><button class="sub" id="loan-sub">—</button></div>
+      <div class="loan-sum" id="loan-sum"></div>
+      <div id="loans"></div>
+      <button class="btn ghost" id="add-loan" style="margin-top:12px">+ Lend / borrow money</button>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h3>This cycle's log</h3><span class="sub" id="log-count">—</span></div>
+      <div id="ledger"></div>
+    </div>
+  </section>
+
+  <!-- ══ STATS ══ -->
+  <section class="view" id="v-stats">
+    <div class="card">
+      <div class="card-h"><h3>What to fix</h3><span class="sub">auto-flagged</span></div>
+      <div id="flags"></div>
+    </div>
+
+    <div class="card" id="dn-card">
+      <div class="card-h"><h3>Where it went</h3><span class="sub">share by envelope</span></div>
+      <div class="dwrap">
+        <div class="dhole"><div class="dchart" id="dchart"></div>
+          <div class="dcenter"><div><div class="t num" id="dn-tot">€0</div><div class="l">spent</div></div></div>
+        </div>
+        <div class="dleg" id="dn-leg"></div>
+      </div>
+    </div>
+
+    <div class="card" id="cmp-card">
+      <div class="card-h"><h3>Vs last cycle</h3><span class="sub" id="cmp-sub">—</span></div>
+      <div id="cmp"></div>
+    </div>
+
+    <div class="card" id="top-card">
+      <div class="card-h"><h3>Biggest expenses</h3><span class="sub">top 5 this cycle</span></div>
+      <div id="top5"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h3>4-month goal</h3><span class="sub" id="goal-range">—</span></div>
+      <div class="goal-ring">
+        <div class="ring">
+          <svg width="100" height="100" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="44" fill="none" stroke="#1D2822" stroke-width="9"/>
+            <circle id="goal-arc" cx="50" cy="50" r="44" fill="none" stroke="#E8C77A" stroke-width="9"
+              stroke-linecap="round" stroke-dasharray="276" stroke-dashoffset="276"/>
+          </svg>
+          <div class="rc"><div class="p num" id="goal-pct">0%</div><div class="l">of goal</div></div>
+        </div>
+        <div class="goal-meta">
+          <div class="gv num" id="goal-saved">€0</div>
+          <div class="gl">saved of <span class="num" id="goal-target">€0</span> target</div>
+          <div class="bar"><span id="goal-bar" style="width:0%;background:var(--gold)"></span></div>
+          <div class="hint" id="goal-hint">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h3>Cycle at a glance</h3></div>
+      <div class="stat-row"><span class="lab">Blocked account</span><span class="val num" id="s-blocked">€0</span></div>
+      <div class="stat-row"><span class="lab">Salary</span><span class="val num" id="s-salary">€0</span></div>
+      <div class="stat-row"><span class="lab">Total income</span><span class="val num" id="s-income">€0</span></div>
+      <div class="stat-row"><span class="lab">Budgeted (envelopes)</span><span class="val num" id="s-budget">€0</span></div>
+      <div class="stat-row"><span class="lab">Spent (bills amortized)</span><span class="val num" id="s-spent">€0</span></div>
+      <div class="stat-row"><span class="lab">Saved so far</span><span class="val num" id="s-saved" style="color:var(--gold)">€0</span></div>
+      <div class="stat-row" id="sr-lent" style="display:none"><span class="lab">Lent out · still yours</span><span class="val num" id="s-lent" style="color:var(--gold)">€0</span></div>
+      <div class="stat-row" id="sr-owe" style="display:none"><span class="lab">Borrowed · you owe</span><span class="val num" id="s-owe" style="color:var(--coral)">€0</span></div>
+      <div class="stat-row"><span class="lab">Savings rate (projected)</span><span class="val num" id="s-rate" style="color:var(--gold)">—</span></div>
+      <div class="stat-row"><span class="lab">Daily burn (avg)</span><span class="val num" id="s-burn">€0</span></div>
+    </div>
+
+    <div class="card" id="flow-card">
+      <div class="card-h"><h3>Money flow</h3><span class="sub" id="flow-sub">—</span></div>
+      <div class="flowbar" id="flowbar"></div>
+      <div id="flow-leg"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h3>Savings history</h3><span class="sub">recent cycles</span></div>
+      <div class="hist" id="hist"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h3>Spend by week</h3><span class="sub">vs weekly pace</span></div>
+      <div class="trend" id="trend"></div>
+    </div>
+
+    <div class="card" id="dd-card">
+      <div class="card-h"><h3>Day by day</h3><span class="sub" id="dd-sub">—</span></div>
+      <div class="daily" id="daily"></div>
+      <div class="dax" id="dax"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h3>Planned vs actual</h3><span class="sub">per envelope</span></div>
+      <div id="pvb"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h3>Items</h3><span class="sub">bought vs planned</span></div>
+      <div id="items"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h3>Records</h3><span class="sub">all time</span></div>
+      <div id="records"></div>
+    </div>
+  </section>
+
+  <!-- ══ SETUP ══ -->
+  <section class="view" id="v-setup">
+    <div class="card">
+      <div class="card-h"><h3>Income & cycle</h3></div>
+      <div class="two">
+        <div class="field"><label>Blocked account · €/mo</label><input class="inp num" id="in-blocked" type="number" inputmode="decimal"></div>
+        <div class="field"><label>Salary · €/mo</label><input class="inp num" id="in-salary" type="number" inputmode="decimal"></div>
+      </div>
+      <div class="field"><label>Cycle starts on day · default</label><input class="inp num" id="in-cycle" type="number" inputmode="numeric" min="1" max="28"></div>
+      <div class="hint">Your month runs from this day to the day before next month. Set to 25 to match your income dates.</div>
+      <div class="divider"></div>
+      <div class="field"><label>Start day for <b class="num" id="ov-period">—</b> <span style="color:var(--faint);font-weight:400">· use ‹ › in the header to pick a month</span></label>
+        <div class="two">
+          <input class="inp num" id="in-cycle-ov" type="number" inputmode="numeric" min="1" max="28" placeholder="default">
+          <button class="btn ghost" id="ov-reset" style="margin:0">Use default</button>
+        </div>
+      </div>
+      <div class="hint">Override the start day for individual months (e.g. 24, 25, 26). Leave blank to fall back to the default above.</div>
+      <div id="ov-list" style="margin-top:10px"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h3>Envelopes</h3><span class="sub">budget · 🔒 = hard limit</span></div>
+      <div id="set-cats"></div>
+      <div class="divider"></div>
+      <div class="two"><input class="inp" id="nc-name" placeholder="New envelope"><input class="inp num" id="nc-bud" type="number" inputmode="decimal" placeholder="€ / cycle"></div>
+      <div class="two" style="margin-top:9px">
+        <select class="inp" id="nc-kind"><option value="var">Flexible spending</option><option value="fixed">Fixed bill</option></select>
+        <button class="btn ghost" id="add-cat" style="margin:0">Add envelope</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h3>Recurring & scheduled</h3><span class="sub">bills · haircut</span></div>
+      <div id="set-rec"></div>
+      <div class="divider"></div>
+      <div class="two">
+        <div class="field"><label>Name</label><input class="inp" id="nr-name" placeholder="e.g. Haircut"></div>
+        <div class="field"><label>Envelope</label><select class="inp" id="nr-cat"></select></div>
+      </div>
+      <div class="two">
+        <div class="field"><label>Amount €</label><input class="inp num" id="nr-amt" type="number" inputmode="decimal" placeholder="0.00"></div>
+        <div class="field"><label>Repeats every</label>
+          <div style="display:flex;gap:8px"><input class="inp num" id="nr-n" type="number" inputmode="numeric" placeholder="1" style="width:64px;flex:none"><select class="inp" id="nr-unit"><option value="months">months</option><option value="days">days</option></select></div>
+        </div>
+      </div>
+      <div class="two">
+        <div class="field"><label>Next due date</label><input class="inp num" id="nr-next" type="date"></div>
+        <div class="field"><label>Spread over cycles</label><input class="inp num" id="nr-cov" type="number" inputmode="numeric" placeholder="1"></div>
+      </div>
+      <button class="btn ghost" id="add-rec">Add recurring</button>
+      <div class="hint">Spread over &gt;1 splits one payment across that many cycles — e.g. a €78 gym pass spread over 3 counts €26 against each cycle.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h3>Item catalog</h3><span class="sub">tap-to-log staples</span></div>
+      <div class="setrow" style="padding:0 0 7px">
+        <span class="sn eyebrow" style="font-size:10px">Item</span>
+        <span class="eyebrow num" style="width:58px;flex:none;text-align:right;font-size:10px">€ price</span>
+        <span class="eyebrow num" style="width:58px;flex:none;text-align:right;font-size:10px">× / cycle</span>
+        <span style="width:30px;flex:none"></span>
+      </div>
+      <div id="set-items"></div>
+      <div class="divider"></div>
+      <div class="field"><input class="inp" id="ni-name" placeholder="Item name (e.g. Milk)"></div>
+      <div class="two">
+        <div class="field"><label>Envelope</label><select class="inp" id="ni-cat"></select></div>
+        <div class="field"><label>Unit price €</label><input class="inp num" id="ni-price" type="number" inputmode="decimal"></div>
+      </div>
+      <div class="field"><label>Planned qty / cycle</label><input class="inp num" id="ni-plan" type="number" inputmode="decimal"></div>
+      <button class="btn ghost" id="add-item">Add item</button>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h3>4-month goal</h3></div>
+      <div class="two">
+        <div class="field"><label>Start cycle</label><input class="inp num" id="in-start" type="month"></div>
+        <div class="field"><label>Duration (cycles)</label><input class="inp num" id="in-months" type="number" inputmode="numeric"></div>
+      </div>
+      <div class="field"><label>Savings so far €</label><input class="inp num" id="in-saved0" type="number" inputmode="decimal"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h3>Lock</h3><span class="sub">PIN privacy</span></div>
+      <button class="btn ghost" id="lock-now">Lock now</button>
+      <button class="btn ghost" id="change-pin">Change PIN</button>
+      <div class="hint">A 4-digit PIN gates access and your data is stored encrypted on this device. Lightweight protection to keep others from casually viewing it — not a defense against someone technical with your unlocked phone. There's no PIN recovery: forget it and you reset the app.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h3>Cloud Sync</h3><span class="sub">Asca Gym account</span></div>
+      <div id="fb-out">
+        <div class="field"><label>Username</label><input class="inp" id="fb-user" autocomplete="username" placeholder="same account as the gym app"></div>
+        <div class="field"><label>Password</label><input class="inp" id="fb-pass" type="password" autocomplete="current-password" placeholder="••••••"></div>
+        <button class="btn primary" id="fb-signin">Sign in</button>
+        <button class="btn ghost" id="fb-signup">Create account</button>
+      </div>
+      <div id="fb-in" style="display:none">
+        <div class="hint" id="fb-who" style="margin-bottom:10px"></div>
+        <button class="btn ghost" id="fb-sync">Sync now</button>
+        <button class="btn ghost" id="fb-rules">Copy database rules</button>
+        <button class="btn danger" id="fb-signout">Sign out</button>
+      </div>
+      <div class="hint" id="fb-stat">Not signed in — data stays on this device.</div>
+      <div class="hint">Same login as the gym tracker. Your budget syncs to its own private <span class="num">budget/</span> node in the shared Firebase database — only your account can read it, so it stays in sync across your devices.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h3>Data</h3><span class="sub">backup & export</span></div>
+      <button class="btn ghost" id="exp-csv">Export CSV (spreadsheet)</button>
+      <button class="btn ghost" id="exp-ious">Export IOUs (CSV)</button>
+      <button class="btn ghost" id="exp-json">Export backup (JSON)</button>
+      <button class="btn ghost" id="imp-json">Import backup</button>
+      <input type="file" id="imp-file" accept="application/json" hidden>
+      <div class="divider"></div>
+      <button class="btn ghost" id="clear-cache">Clear cache & reload</button>
+      <button class="btn danger" id="reset-all">Erase everything</button>
+      <div class="hint">Data lives in this browser (localStorage) and, when signed in, syncs to your private cloud node. Add to Home Screen for an app icon. Export regularly to back up.</div>
+    </div>
+  </section>
+</main>
+
+<button class="fab" id="fab" aria-label="Add expense">+</button>
+
+<nav>
+  <button class="nav-b active" data-view="home">
+    <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Home</button>
+  <button class="nav-b" data-view="stats">
+    <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Stats</button>
+  <button class="nav-b" data-view="setup">
+    <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>Setup</button>
+</nav>
+
+<!-- Add-expense sheet -->
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet">
+  <div class="grab"></div>
+  <h3 id="sheet-title">Add expense</h3>
+  <div class="catpick" id="sheet-cats"></div>
+  <div class="chips" id="sheet-sug"></div>
+  <div class="field"><label>What (optional)</label><input class="inp" id="sh-name" placeholder="e.g. Milk, oats…" enterkeyhint="next"></div>
+  <div class="two">
+    <div class="field"><label>Quantity</label>
+      <div class="qty"><button id="q-minus">−</button><input class="num" id="sh-qty" type="number" inputmode="decimal" value="1"><button id="q-plus">+</button></div>
+    </div>
+    <div class="field"><label>Amount €</label><input class="inp num" id="sh-amt" type="number" inputmode="decimal" placeholder="0.00" enterkeyhint="done"></div>
+  </div>
+  <div class="field"><label>Date</label><input class="inp num" id="sh-date" type="date"></div>
+  <button class="btn primary" id="sh-save">Log it</button>
+</div>
+
+<!-- Lend / borrow sheet -->
+<div class="sheet" id="lsheet">
+  <div class="grab"></div>
+  <h3 id="lsheet-title">Lend / borrow</h3>
+  <div class="seg" id="l-dir">
+    <button data-dir="lent" class="sel">I lent money</button>
+    <button data-dir="borrowed">I borrowed</button>
+  </div>
+  <div class="field"><label>Who</label><input class="inp" id="l-person" list="l-people" placeholder="e.g. Rohit" enterkeyhint="next"><datalist id="l-people"></datalist></div>
+  <div class="two">
+    <div class="field"><label>Amount €</label><input class="inp num" id="l-amt" type="number" inputmode="decimal" placeholder="0.00"></div>
+    <div class="field"><label>Date</label><input class="inp num" id="l-date" type="date"></div>
+  </div>
+  <div class="two">
+    <div class="field"><label>Due back (optional)</label><input class="inp num" id="l-due" type="date"></div>
+    <div class="field"><label>Note (optional)</label><input class="inp" id="l-note" placeholder="e.g. dinner split"></div>
+  </div>
+  <button class="btn primary" id="l-save">Save</button>
+  <div class="hint">IOUs live outside your budget — they never count as spending, income or savings. Money you lend stays counted as yours until it comes back.</div>
+</div>
+
+<!-- Repayment sheet -->
+<div class="sheet" id="psheet">
+  <div class="grab"></div>
+  <h3 id="psheet-title">Log repayment</h3>
+  <div class="chips" style="margin-bottom:16px">
+    <button class="chip" id="p-half">Half</button>
+    <button class="chip" id="p-all">All of it</button>
+  </div>
+  <div class="two">
+    <div class="field"><label>Amount €</label><input class="inp num" id="p-amt" type="number" inputmode="decimal"></div>
+    <div class="field"><label>Date</label><input class="inp num" id="p-date" type="date"></div>
+  </div>
+  <div id="p-hist"></div>
+  <button class="btn primary" id="p-save">Settle in full</button>
+  <div class="hint" id="p-hint"></div>
+</div>
+
+<!-- Hard-limit confirm -->
+<div class="scrim" id="cscrim" style="z-index:59"></div>
+<div class="cmodal" id="cmodal">
+  <h4 id="cm-title">Over hard limit</h4>
+  <p id="cm-msg"></p>
+  <div class="crow"><button class="btn ghost" id="cm-cancel">Cancel</button><button class="btn primary" id="cm-ok">Log anyway</button></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="firebase-sync.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
