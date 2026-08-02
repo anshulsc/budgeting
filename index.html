@@ -905,6 +905,7 @@ var FB=(function(){
       cats:toArr(d.cats),
       items:toArr(d.items),
       recurring:toArr(d.recurring),
+      del:(d.del&&typeof d.del==='object')?d.del:{},   // deletion tombstones {id: ts}
       loans:normDated(d.loans).map(function(l){l=l||{};l.pays=toArr(l.pays);return l;}),
       exp:normDated(d.exp)
     };
@@ -1112,26 +1113,42 @@ function fbPushNow(){
     });
   }).catch(function(e){fbStatus('Sync failed — '+e.message,true);});
 }
-function unionById(a,b){ // union of two record lists; `a` wins on id conflicts
-  var out=(a||[]).slice(),seen={};
-  out.forEach(function(x){if(x&&x.id)seen[x.id]=1;});
-  (b||[]).forEach(function(x){if(x&&x.id&&!seen[x.id])out.push(x);});
+/* Tombstones: a union merge alone can never propagate a deletion — the
+   other side still holds the record, so it comes straight back. Deleting
+   records the id in S.del {id: whenDeleted}; the merge drops any id either
+   side has buried, and undo resurrects by clearing the tombstone. Entries
+   are pruned after TOMB_TTL so the map can't grow forever. */
+var TOMB_TTL=120*864e5; // 120 days — far longer than any device stays offline
+function tombstone(id){if(!S.del)S.del={};S.del[id]=Date.now();}
+function untombstone(id){if(S.del)delete S.del[id];}
+function pruneTombs(m){
+  var out={},cut=Date.now()-TOMB_TTL;
+  Object.keys(m||{}).forEach(function(k){if(+m[k]>cut)out[k]=+m[k];});
+  return out;
+}
+function unionById(a,b,dead){ // union of two record lists; `a` wins on id conflicts
+  var out=[],seen={};
+  (a||[]).forEach(function(x){if(x&&x.id&&!seen[x.id]&&!(dead&&dead[x.id])){seen[x.id]=1;out.push(x);}});
+  (b||[]).forEach(function(x){if(x&&x.id&&!seen[x.id]&&!(dead&&dead[x.id])){seen[x.id]=1;out.push(x);}});
   return out;
 }
 // Merge cloud + local: settings come from whichever side edited last,
 // record lists are unioned by id (newer side wins on conflicts) so no
-// device's entries are lost.
+// device's entries are lost — except ids either side has tombstoned,
+// which is how a deletion travels between devices at all.
 function fbMergeStates(loc,cld,cldTs){
   var localNewer=(fbMeta().edit||0)>cldTs;
   var base=localNewer?loc:cld, other=localNewer?cld:loc;
+  var dead=pruneTombs({...(cld.del||{}),...(loc.del||{})});
   return {
     income:base.income,cycleDay:base.cycleDay,cycleDays:base.cycleDays,
     startSavings:base.startSavings,goal:base.goal,
+    del:dead,
     cats:unionById(base.cats,other.cats),
     items:unionById(base.items,other.items),
     recurring:unionById(base.recurring,other.recurring),
-    loans:unionById(base.loans,other.loans),
-    exp:unionById(base.exp,other.exp)
+    loans:unionById(base.loans,other.loans,dead),
+    exp:unionById(base.exp,other.exp,dead)
   };
 }
 function fbRestoreFlow(){
@@ -1282,6 +1299,7 @@ function initApp(){
   S=load();
   if(!S.cycleDays)S.cycleDays={};
   if(!S.loans)S.loans=[];
+  S.del=pruneTombs(S.del);
   curP=periodOf(todayISO()); // always open on the cycle that contains today
   if(!localStorage.getItem(KEY))save(); // persist defaults encrypted on first unlock
   renderAll();
@@ -1893,7 +1911,7 @@ function logItem(it){
     lastLogged=e;showToast('Logged <b>'+esc(shortName(it.name))+'</b> '+eur2(it.price),undoLast);
   });
 }
-function delExpense(id){S.exp=S.exp.filter(function(e){return e.id!==id;});save();renderAll();}
+function delExpense(id){S.exp=S.exp.filter(function(e){return e.id!==id;});tombstone(id);save();renderAll();}
 
 function askConfirm(title,msg,cb,okLabel){
   pendingConfirm=cb;$('#cm-title').innerHTML=title;$('#cm-msg').innerHTML=msg;
@@ -1983,7 +2001,7 @@ $('#v-home').addEventListener('click',function(e){
     var ex=S.exp.filter(function(x){return x.id===t.dataset.del;})[0];
     delExpense(t.dataset.del);
     if(ex)showToast('Deleted <b>'+esc(ex.name||(catOf(ex.cat)||{name:'entry'}).name)+'</b> '+eur2(ex.amt),
-      function(){S.exp.push(ex);save();renderAll();});
+      function(){untombstone(ex.id);S.exp.push(ex);save();renderAll();});
   }
   else if(t.dataset.edit)editExpense(t.dataset.edit);
   else if(t.dataset.pay)payFixed(t.dataset.pay);
@@ -2089,9 +2107,9 @@ $('#loan-card').addEventListener('click',function(e){
   else if(t.dataset.ledit){var le=loanOf(t.dataset.ledit);if(le)openLoanSheet(le);}
   else if(t.dataset.ldel){
     var id=t.dataset.ldel,ld=loanOf(id);
-    S.loans=S.loans.filter(function(x){return x.id!==id;});save();renderAll();
+    S.loans=S.loans.filter(function(x){return x.id!==id;});tombstone(id);save();renderAll();
     if(ld)showToast('Deleted IOU with <b>'+esc(ld.person)+'</b> '+eur2(ld.amt),
-      function(){S.loans.push(ld);save();renderAll();});
+      function(){untombstone(ld.id);S.loans.push(ld);save();renderAll();});
   }
 });
 

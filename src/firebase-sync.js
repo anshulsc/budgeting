@@ -93,6 +93,7 @@ var FB=(function(){
       cats:toArr(d.cats),
       items:toArr(d.items),
       recurring:toArr(d.recurring),
+      del:(d.del&&typeof d.del==='object')?d.del:{},   // deletion tombstones {id: ts}
       loans:normDated(d.loans).map(function(l){l=l||{};l.pays=toArr(l.pays);return l;}),
       exp:normDated(d.exp)
     };
