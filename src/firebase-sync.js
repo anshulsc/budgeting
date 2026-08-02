@@ -93,9 +93,52 @@ var FB=(function(){
       cats:toArr(d.cats),
       items:toArr(d.items),
       recurring:toArr(d.recurring),
-      loans:toArr(d.loans).map(function(l){l=l||{};l.pays=toArr(l.pays);return l;}),
-      exp:toArr(d.exp)
+      loans:normDated(d.loans).map(function(l){l=l||{};l.pays=toArr(l.pays);return l;}),
+      exp:normDated(d.exp)
     };
+  }
+  // Dated records (expenses, IOUs) are stored month-wise then date-wise,
+  // each under its own id — { "YYYY-MM": { "YYYY-MM-DD": { id: {…} } } } —
+  // so every transaction is directly browsable in the RTDB console, the
+  // same idea as the gym app's date-keyed workouts. The in-app shape
+  // stays a flat array; these two convert on push ⇄ pull.
+  function datedToMap(list){
+    var m={};
+    (list||[]).forEach(function(e){
+      if(!e||!e.date||!e.id)return;
+      var mo=String(e.date).slice(0,7);
+      var rec={},k;
+      for(k in e)if(k!=='date'&&k!=='id'&&e[k]!=null)rec[k]=e[k];
+      if(!m[mo])m[mo]={};
+      if(!m[mo][e.date])m[mo][e.date]={};
+      m[mo][e.date][e.id]=rec;
+    });
+    return m;
+  }
+  function datedToArray(map){
+    var out=[];
+    if(!map||typeof map!=='object')return out;
+    Object.keys(map).sort().forEach(function(mo){
+      var days=map[mo];if(!days||typeof days!=='object')return;
+      Object.keys(days).sort().forEach(function(date){
+        var recs=days[date];if(!recs||typeof recs!=='object')return;
+        Object.keys(recs).forEach(function(id){
+          var e=recs[id]||{},o={id:id,date:date},k;
+          for(k in e)o[k]=e[k];
+          out.push(o);
+        });
+      });
+    });
+    return out;
+  }
+  // Accepts both shapes on read: the month/date map (current), or a plain
+  // array / numeric-keyed object (docs pushed by the first build).
+  function normDated(v){
+    if(!v)return [];
+    if(Array.isArray(v))return v;
+    var keys=Object.keys(v);
+    if(keys.length&&keys.every(function(k){return /^\d+$/.test(k);}))return toArr(v);
+    return datedToArray(v);
   }
   function pull(){ // read my node; resolves {ts, state} or null when it doesn't exist yet
     return token().then(function(t){
@@ -111,7 +154,11 @@ var FB=(function(){
   }
   function push(state,ts){ // create-or-overwrite budget/{id}
     return token().then(function(t){
-      var body={uid:auth.uid,ts:ts||Date.now(),name:uname().slice(0,60),data:state};
+      var data={},k;
+      for(k in state)if(k!=='exp'&&k!=='loans')data[k]=state[k];
+      data.exp=datedToMap(state.exp);     // month → date → id, console-browsable
+      data.loans=datedToMap(state.loans);
+      var body={uid:auth.uid,ts:ts||Date.now(),name:uname().slice(0,60),data:data};
       return fetch(RTDB_URL+'/budget/'+encodeURIComponent(nodeId())+'.json?auth='+t,
         {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     }).then(function(r){

@@ -16,7 +16,10 @@ A self-contained, mobile-first personal budget tracker. Distributed as a single 
   [Asca Gym app](https://anshulsc.github.io/asca-life/) and your budget syncs
   to a private `budget/{username}` node in the shared Firebase Realtime
   Database — pushed after every save, pulled and merged on unlock, so it
-  follows you across devices. Without signing in, data stays on-device only.
+  follows you across devices. Every transaction and IOU is stored month-wise,
+  then date by date, each under its own id
+  (`data/exp/2026-08/2026-08-02/{id}`), so the full ledger is directly
+  browsable in the RTDB console. Without signing in, data stays on-device only.
 
 ## Build
 **Never edit the top-level `index.html` directly** — it is generated. Edit the
