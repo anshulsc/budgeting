@@ -140,6 +140,11 @@ var FB=(function(){
     if(keys.length&&keys.every(function(k){return /^\d+$/.test(k);}))return toArr(v);
     return datedToArray(v);
   }
+  function readTs(){ // cheap freshness probe: just my node's ts
+    return token().then(function(t){
+      return fetch(RTDB_URL+'/budget/'+encodeURIComponent(nodeId())+'/ts.json?auth='+t);
+    }).then(function(r){return r.ok?r.json():0;}).then(function(v){return +v||0;});
+  }
   function pull(){ // read my node; resolves {ts, state} or null when it doesn't exist yet
     return token().then(function(t){
       return fetch(RTDB_URL+'/budget/'+encodeURIComponent(nodeId())+'.json?auth='+t);
@@ -168,5 +173,5 @@ var FB=(function(){
     });
   }
   loadAuth();
-  return {signIn:signIn,signUp:signUp,signOut:signOut,restore:restore,user:user,pull:pull,push:push,nodeId:nodeId};
+  return {signIn:signIn,signUp:signUp,signOut:signOut,restore:restore,user:user,pull:pull,push:push,readTs:readTs,nodeId:nodeId};
 })();

@@ -108,12 +108,18 @@ function fbTouch(){
 }
 function fbPushNow(){
   if(!FB.user())return;
-  var ts=Date.now();
   fbStatus('Syncing…');
-  FB.push(S,ts).then(function(){
-    var m=fbMeta();m.ts=ts;setFbMeta(m);
-    fbStatus('Synced ✓');
-  },function(e){fbStatus('Sync failed — '+e.message,true);});
+  // A push PUT-replaces the whole node, so never push blind: if the cloud
+  // holds a write we haven't seen (another device, the maintainer CLI),
+  // pull + merge first — the merged doc then pushes itself back.
+  FB.readTs().then(function(cloudTs){
+    if(cloudTs>(fbMeta().ts||0)){fbReady=false;fbRestoreFlow();return;}
+    var ts=Date.now();
+    return FB.push(S,ts).then(function(){
+      var m=fbMeta();m.ts=ts;setFbMeta(m);
+      fbStatus('Synced ✓');
+    });
+  }).catch(function(e){fbStatus('Sync failed — '+e.message,true);});
 }
 function unionById(a,b){ // union of two record lists; `a` wins on id conflicts
   var out=(a||[]).slice(),seen={};
