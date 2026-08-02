@@ -204,6 +204,25 @@ $('#fb-signup').onclick=function(){fbAuth('up');};
 $('#fb-pass').addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();fbAuth('in');}});
 $('#fb-signout').onclick=function(){FB.signOut();renderFbCard();fbStatus('Signed out — data stays on this device.');};
 $('#fb-sync').onclick=function(){fbReady=false;fbRestoreFlow();};
+// Hard fetch: take the cloud's copy wholesale, no merge — for when this
+// device's local state differs and the cloud is the one you trust.
+$('#fb-fetch').onclick=function(){
+  if(!FB.user()){fbStatus('Sign in first',true);return;}
+  fbStatus('Fetching cloud copy…');
+  FB.pull().then(function(cloud){
+    if(!cloud||!cloud.state){fbStatus('No cloud data yet',true);return;}
+    S=cloud.state;
+    if(!S.cycleDays)S.cycleDays={};
+    if(!S.loans)S.loans=[];
+    hadLocal=true;
+    fbReady=true;
+    save();
+    clearTimeout(fbTimer); // nothing to push back — we ARE the cloud copy now
+    var m=fbMeta();m.ts=cloud.ts;m.edit=0;setFbMeta(m);
+    curP=periodOf(todayISO());renderAll();
+    fbStatus('Cloud copy loaded — this device now matches the cloud ✓');
+  },function(e){fbStatus('Fetch failed — '+e.message,true);});
+};
 // Full ruleset for the SHARED asca-gym database — the gym app's rules
 // plus the budget/ section. Publishing this replaces the whole rules
 // document, so it must always carry every node both apps use.
@@ -1233,7 +1252,21 @@ function showLock(mode){lockMode=mode;entered='';tempPin='';lockErr('');updateDo
   setSub(mode==='create'?'Create a 4-digit PIN':mode==='change-new'?'Enter a new PIN':'Enter your PIN');
   $('#lock').classList.add('show');window.scrollTo(0,0);}
 function hideLock(){$('#lock').classList.remove('show');}
-function bootLock(){showLock(lockCfg()?'enter':'create');}
+/* Stay unlocked on this device: after a successful PIN entry the PIN is
+   remembered (lightly obfuscated) so refreshes/relaunches skip the lock
+   screen. "Lock now" forgets it and requires the PIN again. Storing the
+   PIN on-device trades the casual-privacy shield for convenience. */
+var UNLOCKKEY='asca_budget_unlock';
+function rememberUnlock(pin){try{localStorage.setItem(UNLOCKKEY,btoa(pin));}catch(e){}}
+function savedUnlock(){try{return atob(localStorage.getItem(UNLOCKKEY)||'');}catch(e){return '';}}
+function bootLock(){
+  var cfg=lockCfg();
+  if(cfg){
+    var saved=savedUnlock();
+    if(saved&&hashStr(saved+'|'+cfg.salt)===cfg.hash){pinKey=saved;initApp();return;}
+    showLock('enter');
+  }else showLock('create');
+}
 function pressKey(k){
   if(k==='del'){entered=entered.slice(0,-1);lockErr('');updateDots();return;}
   if(entered.length>=4)return;
@@ -1248,7 +1281,7 @@ function submitPin(){
   if(lockMode==='confirm'||lockMode==='change-confirm'){
     if(entered===tempPin){
       var changing=(lockMode==='change-confirm');
-      setLockCfg(tempPin);pinKey=tempPin;entered='';updateDots();
+      setLockCfg(tempPin);pinKey=tempPin;rememberUnlock(tempPin);entered='';updateDots();
       if(changing){save();hideLock();showToast('PIN changed');}
       else{lockErr('');hideLock();initApp();}
     }else{
@@ -1258,7 +1291,7 @@ function submitPin(){
     return;
   }
   var cfg=lockCfg();
-  if(cfg&&hashStr(entered+'|'+cfg.salt)===cfg.hash){pinKey=entered;entered='';updateDots();lockErr('');hideLock();initApp();}
+  if(cfg&&hashStr(entered+'|'+cfg.salt)===cfg.hash){pinKey=entered;rememberUnlock(entered);entered='';updateDots();lockErr('');hideLock();initApp();}
   else{entered='';updateDots();lockErr('Wrong PIN');}
 }
 $('#keypad').addEventListener('click',function(e){var t=e.target.closest('[data-k]');if(t)pressKey(t.dataset.k);});
@@ -1276,7 +1309,7 @@ $('#lock-reset').onclick=function(){
     location.reload();
   }
 };
-$('#lock-now').onclick=function(){pinKey=null;showLock('enter');};
+$('#lock-now').onclick=function(){try{localStorage.removeItem(UNLOCKKEY);}catch(e){}pinKey=null;showLock('enter');};
 $('#change-pin').onclick=function(){showLock('change-new');};
 
 bootLock();
