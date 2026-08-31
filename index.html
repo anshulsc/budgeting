@@ -1236,58 +1236,174 @@ $('#fb-fetch').onclick=function(){
 // document, so it must always carry every node both apps use.
 $('#fb-rules').onclick=function(){
   var rules=JSON.stringify({
-    rules:{
-      gym:{
-        $userId:{
-          ".read":"auth != null",
-          ".write":"auth != null && (data.exists() ? data.child('uid').val() === auth.uid : newData.child('uid').val() === auth.uid)",
-          ".validate":"newData.hasChildren(['uid','ts']) && newData.child('uid').val() === auth.uid && newData.child('ts').isNumber()",
-          name:{".validate":"newData.isString() && newData.val().length <= 60"},
-          bio:{".validate":"newData.isString() && newData.val().length <= 120"},
-          github:{".validate":"newData.isString() && newData.val().length <= 40"},
-          avatar:{".validate":"newData.isString() && newData.val().length <= 200000"},
-          bw:{".validate":"newData.isNumber() && newData.val() >= 0 && newData.val() <= 700"}
+    rules: {
+      // Any signed-in member can read (Strava-style); only the owner
+      // (uid) may write, and the payload is validated + size-capped so
+      // a hostile client can't store malformed or oversized data.
+      gym: {
+        $userId: {
+          ".read": "auth != null",
+          ".write": "auth != null && (data.exists() ? data.child('uid').val() === auth.uid : newData.child('uid').val() === auth.uid)",
+          ".validate": "newData.hasChildren(['uid','ts']) && newData.child('uid').val() === auth.uid && newData.child('ts').isNumber()",
+          name: {
+            ".validate": "newData.isString() && newData.val().length <= 60"
+          },
+          bio: {
+            ".validate": "newData.isString() && newData.val().length <= 120"
+          },
+          github: {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
+          avatar: {
+            ".validate": "newData.isString() && newData.val().length <= 200000"
+          },
+          bw: {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 700"
+          }
         }
       },
-      directory:{
-        ".read":"auth != null",
-        $userId:{
-          ".write":"auth != null && (newData.child('uid').val() === auth.uid || root.child('gym').child($userId).child('uid').val() === auth.uid)",
-          uid:{".validate":"newData.val() === auth.uid"},
-          name:{".validate":"newData.isString() && newData.val().length <= 60"},
-          bio:{".validate":"newData.isString() && newData.val().length <= 120"},
-          avatar:{".validate":"newData.isString() && newData.val().length <= 200000"},
-          bw:{".validate":"newData.isNumber() && newData.val() >= 0 && newData.val() <= 700"},
-          ts:{".validate":"newData.isNumber()"}
+      // Writable by the node's owner: self-uid stamp (atomic writes) or
+      // the matching gym node's uid (legacy path). Fields are validated.
+      directory: {
+        ".read": "auth != null",
+        $userId: {
+          ".write": "auth != null && (newData.child('uid').val() === auth.uid || root.child('gym').child($userId).child('uid').val() === auth.uid)",
+          uid: {
+            ".validate": "newData.val() === auth.uid"
+          },
+          name: {
+            ".validate": "newData.isString() && newData.val().length <= 60"
+          },
+          bio: {
+            ".validate": "newData.isString() && newData.val().length <= 120"
+          },
+          avatar: {
+            ".validate": "newData.isString() && newData.val().length <= 200000"
+          },
+          bw: {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 700"
+          },
+          ts: {
+            ".validate": "newData.isNumber()"
+          }
         }
       },
-      kudos:{
-        ".read":"auth != null",
-        $ownerId:{$date:{$likerUid:{
-          ".write":"auth != null && auth.uid === $likerUid",
-          ".validate":"newData.val() === true"
-        }}}
+      kudos: {
+        ".read": "auth != null",
+        $ownerId: {
+          $date: {
+            $likerUid: {
+              ".write": "auth != null && auth.uid === $likerUid",
+              ".validate": "newData.val() === true"
+            }
+          }
+        }
       },
-      comments:{
-        ".read":"auth != null",
-        $ownerId:{$date:{$commentId:{
-          ".write":"auth != null && (!data.exists() ? newData.child('uid').val() === auth.uid : data.child('uid').val() === auth.uid)",
-          ".validate":"newData.hasChildren(['uid','text','ts']) && newData.child('uid').val() === auth.uid && newData.child('text').isString() && newData.child('text').val().length <= 300 && newData.child('ts').isNumber()"
-        }}}
+      comments: {
+        ".read": "auth != null",
+        $ownerId: {
+          $date: {
+            $commentId: {
+              ".write": "auth != null && (!data.exists() ? newData.child('uid').val() === auth.uid : data.child('uid').val() === auth.uid)",
+              ".validate": "newData.hasChildren(['uid','text','ts']) && newData.child('uid').val() === auth.uid && newData.child('text').isString() && newData.child('text').val().length <= 300 && newData.child('ts').isNumber()"
+            }
+          }
+        }
       },
-      progress:{
-        ".read":"auth != null",
-        $ownerId:{$picId:{
-          ".write":"auth != null && root.child('gym').child($ownerId).child('uid').val() === auth.uid && (!newData.exists() || newData.child('uid').val() === auth.uid)",
-          ".validate":"!newData.exists() || (newData.hasChildren(['uid','img','ts']) && newData.child('uid').val() === auth.uid && newData.child('img').isString() && newData.child('img').val().length <= 900000 && newData.child('ts').isNumber())"
-        }}
+      // Progress pics stored as base64 JPEG (`img`) directly in RTDB —
+      // no Cloud Storage / billing. Any member can read; only the owner
+      // of that username's gym node may write/delete, the record must
+      // stamp their own uid, and `img` is size-capped (~900KB).
+      progress: {
+        ".read": "auth != null",
+        $ownerId: {
+          $picId: {
+            ".write": "auth != null && root.child('gym').child($ownerId).child('uid').val() === auth.uid && (!newData.exists() || newData.child('uid').val() === auth.uid)",
+            ".validate": "!newData.exists() || (newData.hasChildren(['uid','img','ts']) && newData.child('uid').val() === auth.uid && newData.child('img').isString() && newData.child('img').val().length <= 900000 && newData.child('ts').isNumber())"
+          }
+        }
       },
-      budget:{
-        $userId:{
-          ".read":"auth != null && (!data.exists() || data.child('uid').val() === auth.uid)",
-          ".write":"auth != null && (data.exists() ? data.child('uid').val() === auth.uid : newData.child('uid').val() === auth.uid)",
-          ".validate":"newData.hasChildren(['uid','ts']) && newData.child('uid').val() === auth.uid && newData.child('ts').isNumber()",
-          name:{".validate":"newData.isString() && newData.val().length <= 60"}
+      // Asca Budget app (separate site, same accounts): one private
+      // doc per user at budget/{userId}. Unlike gym data budgets are
+      // NOT social — only the owning account may read its node (a
+      // missing node stays readable so first sync can see it's empty).
+      budget: {
+        $userId: {
+          ".read": "auth != null && (!data.exists() || data.child('uid').val() === auth.uid)",
+          ".write": "auth != null && (data.exists() ? data.child('uid').val() === auth.uid : newData.child('uid').val() === auth.uid)",
+          ".validate": "newData.hasChildren(['uid','ts']) && newData.child('uid').val() === auth.uid && newData.child('ts').isNumber()",
+          name: {
+            ".validate": "newData.isString() && newData.val().length <= 60"
+          }
+        }
+      },
+      // Winter Arc private season state: goals, daily check-ins, xp/level,
+      // streak, badges. Owner-read-only — sleep/protein/water/steps never
+      // leave this node, which is what makes the social surfaces safe.
+      arc: {
+        $userId: {
+          ".read": "auth != null && (!data.exists() || data.child('uid').val() === auth.uid)",
+          ".write": "auth != null && (data.exists() ? data.child('uid').val() === auth.uid : newData.child('uid').val() === auth.uid)",
+          $seasonId: {
+            ".validate": "newData.hasChildren(['uid','ts']) && newData.child('uid').val() === auth.uid && newData.child('ts').isNumber()"
+          }
+        }
+      },
+      // The narrow social projection of arc/: xp, level, streak, badge
+      // count. Member-readable like directory/. NEVER sleep, protein,
+      // water, steps or body weight — those stay in arc/ only.
+      arcPublic: {
+        ".read": "auth != null",
+        $userId: {
+          ".write": "auth != null && (newData.child('uid').val() === auth.uid || root.child('gym').child($userId).child('uid').val() === auth.uid)",
+          $seasonId: {
+            uid: {
+              ".validate": "newData.val() === auth.uid"
+            },
+            ts: {
+              ".validate": "newData.isNumber()"
+            }
+          }
+        }
+      },
+      // Challenge definitions (built-in or friend-created). Any member
+      // may read; only the creator may write, checked both on create
+      // (no existing owner yet) and on every subsequent edit.
+      challenges: {
+        ".read": "auth != null",
+        $cid: {
+          ".write": "auth != null && (!data.exists() ? newData.child('ownerUid').val() === auth.uid : data.child('ownerUid').val() === auth.uid)",
+          ".validate": "newData.hasChildren(['ownerUid','ts']) && newData.child('ts').isNumber()",
+          name: {
+            ".validate": "newData.isString() && newData.val().length <= 60"
+          },
+          desc: {
+            ".validate": "newData.isString() && newData.val().length <= 200"
+          }
+        }
+      },
+      // Sibling of challenges/, not a child — a member can write ONLY
+      // their own progress here with no write access to the definition.
+      // The owner may also write, to remove a member.
+      challengeMembers: {
+        ".read": "auth != null",
+        $cid: {
+          $userId: {
+            ".write": "auth != null && (root.child('gym').child($userId).child('uid').val() === auth.uid || root.child('challenges').child($cid).child('ownerUid').val() === auth.uid)",
+            ".validate": "!newData.exists() || (newData.hasChildren(['uid','ts']) && newData.child('ts').isNumber())"
+          }
+        }
+      },
+      // The sender creates an invite; the recipient can read + delete
+      // their own inbox (accept = join elsewhere + delete; decline =
+      // delete). Mirrors the gym-node-owner trick used by directory/.
+      invites: {
+        $inviteeId: {
+          ".read": "auth != null && root.child('gym').child($inviteeId).child('uid').val() === auth.uid",
+          $cid: {
+            ".write": "auth != null && (newData.child('fromUid').val() === auth.uid || root.child('gym').child($inviteeId).child('uid').val() === auth.uid)",
+            ".validate": "!newData.exists() || (newData.hasChildren(['fromUid','ts']) && newData.child('fromUid').val() === auth.uid && newData.child('ts').isNumber())"
+          }
         }
       }
     }
